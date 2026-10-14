@@ -1,0 +1,155 @@
+--Creat Database
+create database retail_sales_22_23
+
+-- Creat Table
+IF OBJECT_ID('Sales', 'U') IS NOT NULL
+    DROP TABLE dbo.Sales;
+Create table Sales 
+	(transactions_id int primary key,
+	sale_date date,
+	sale_time time,
+	customer_id int,
+	gender	varchar(50),
+	age int,
+	category varchar(50),
+	quantiy	int,
+	price_per_unit float,
+	cogs float,
+	total_sale float);
+
+--Insert Data into table
+bulk insert retail_sales_22_23.dbo.Sales
+from 'C:\Users\nidhi\Downloads\SQL - Retail Sales Analysis_utf .csv'
+with (
+	Firstrow = 2,
+    FIELDTERMINATOR = ',', -- Separator between columns
+    ROWTERMINATOR = '\n'   -- Line break separator
+);
+
+--Check null values
+select * from Sales
+where
+	transactions_id is null
+	or
+	sale_date is null
+	or
+	sale_time is null
+	or
+	customer_id is null
+	or
+	gender	is null
+	or
+	category is null
+	or
+	quantiy	is null
+	or
+	price_per_unit is null
+	or
+	cogs is null
+	or
+	total_sale is null;
+
+--Remove null values
+delete from Sales 
+where quantiy is null
+
+--Data Exploration
+--how many sales ?
+select count(*) as 'No of Sales' from Sales
+
+--How many customer?
+Select count (distinct([customer_id])) as Total_Customer from Sales 
+
+--How many category?
+Select count (distinct([category])) as Total_Category from Sales 
+
+
+--Data Analysis
+--Q1 - sales done on 2022-11-05
+select * from Sales
+where sale_date = '2022-11-05'
+
+--Q2 - transaction in clothing category where quantity > 3 in nov-2022.
+select * from Sales
+	where [category] = 'Clothing'
+	and [quantiy] > 3
+	and datetrunc (month,[sale_date]) = '2022-11-01'
+
+--Q3 sales by category
+select [category], SUM([total_sale]) as 'Sales', count(*) as 'Count' from Sales group by [category]
+ 
+--Q4 Avg age of customer from beauty category
+ Select Avg([Age]) as  age from Sales where [category] = 'Beauty' 
+
+--Q5 total sales > 1000
+Select * from Sales
+where [total_sale] > 1000
+
+--Q6 sales by gender in each category
+select category, gender, count([total_sale]) as 'Sales' from Sales group by category, gender
+
+--Q7 avg sales by month and best selling month each year
+--option -1
+with cte1 as
+(
+Select
+year([sale_date]) as 'Year',
+DATETRUNC(month,[sale_date]) as 'Month',
+AVG([total_sale]) as 'avg_Sales',
+dense_RANK() over (partition by year([sale_date]) order by (AVG([total_sale])) desc) as 'rank'
+from Sales
+group by 
+year([sale_date]),
+DATETRUNC(month,[sale_date])
+)
+select * from cte1
+where [rank] =1
+
+-- option-2
+select * from 
+(
+Select
+year([sale_date]) as 'Year',
+DATETRUNC(month,[sale_date]) as 'Month',
+AVG([total_sale]) as 'avg_Sales',
+dense_RANK() over (partition by year([sale_date]) order by (AVG([total_sale])) desc) as 'rank'
+from Sales
+group by 
+year([sale_date]),
+DATETRUNC(month,[sale_date])
+) as sub1
+where [rank] =1
+
+--Q8 top 5 customer basis highest total sales
+Select top 5
+customer_id,
+sum([total_sale]) as 'Sales'
+from Sales
+group by customer_id
+order by sum([total_sale]) desc
+
+--Q9 number of unique customer for each category
+
+select
+[category],
+count (distinct[customer_id]) as 'Cust Count'
+from Sales
+group by category
+
+--Q10 number of order per shift (Mrng <=12, Afternoon between 12 and 17, Evening > 17 )
+with cte2 as
+(
+Select
+       CASE 
+        WHEN [sale_time] < '12:00:00' THEN 'Morning'
+        WHEN [sale_time] >=  '12:00:00' AND [sale_time] <= '17:00:00' THEN 'Afternoon'
+        WHEN [sale_time] > '17:00:00' THEN 'Evening'
+        ELSE 'Night'
+    END AS TimeOfDay,
+	transactions_id
+from Sales
+)
+select [TimeOfDay], count([transactions_id]) as orders from cte2 group by [TimeOfDay]
+
+
+----End of Project
